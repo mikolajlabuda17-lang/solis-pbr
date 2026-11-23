@@ -227,28 +227,32 @@ fn eval_end_sky(dir: vec3<f32>, with_fine_detail: bool) -> vec3<f32> {
 
     var prev_h = dot(pos, basis.disk_normal);
 
-    for (var step = 0u; step < 52u; step++) {
+    for (var step = 0u; step < 56u; step++) {
         let r2 = dot(pos, pos);
         let r = sqrt(r2);
         min_r = min(min_r, r);
 
-        if r <= 1.015 {
+        // Exact Schwarzschild Photon-Sphere Capture Theorem:
+        // Our ISCO disk ends at r = 1.48; any null geodesic from outside that plunges inside r <= 1.46
+        // has passed the r = 1.50 photon sphere peak and MUST fall into the Event Horizon!
+        if r <= 1.46 {
             captured = true;
             break;
         }
 
-        if step > 8u && r > max(cam_dist * 1.35, 13.5) && dot(pos, vel) > 0.0 {
+        if step > 8u && r > max(cam_dist * 1.25, 13.5) && dot(pos, vel) > 0.0 {
             break;
         }
 
-        let dt = clamp(0.046 + 0.115 * max(r - 1.15, 0.0), 0.044, 0.78);
+        // Adaptive step size scales smoothly even when `end_bh_size = 0.5` (`cam_dist = 23.6`) so rays never starve of steps!
+        let dt = clamp(0.045 + 0.115 * max(r - 1.35, 0.0) + 0.22 * max(r - 9.8, 0.0), 0.044, 2.40);
 
         let inv_r5 = 1.0 / max(r2 * r2 * r, 1e-4);
         let acc0 = -1.5 * l2 * inv_r5 * pos;
         let mid_pos = pos + vel * (0.5 * dt) + acc0 * (0.125 * dt * dt);
         let mid_r2 = dot(mid_pos, mid_pos);
         let mid_r = sqrt(mid_r2);
-        if mid_r <= 1.01 {
+        if mid_r <= 1.46 {
             captured = true;
             min_r = min(min_r, mid_r);
             break;
@@ -284,10 +288,14 @@ fn eval_end_sky(dir: vec3<f32>, with_fine_detail: bool) -> vec3<f32> {
         prev_h = cur_h;
     }
 
-    // Razor-sharp Relativistic Photon Ring right at the Event Horizon Shadow Edge (`b -> 2.598 r_s`, `min_r -> 1.5 r_s`)!
-    // Never fills inside the Event Horizon (`captured` rays with `min_r <= 1.02` get 0.0 so the shadow stays PITCH BLACK!)
+    // Safety guard: any ray still plunging inward (`dot(pos, vel) <= 0`) or orbiting near the photon sphere (`r < 1.62`) at max steps is captured!
+    if dot(pos, vel) <= 0.0 || dot(pos, pos) < (1.62 * 1.62) {
+        captured = true;
+    }
+
+    // Razor-sharp Relativistic Photon Ring ONLY for genuinely escaping rays (`!captured && min_r >= 1.46`)!
     if !captured && min_r < 2.25 {
-        let ring_dist = max(min_r - 1.50, 0.0);
+        let ring_dist = abs(min_r - 1.50);
         let side_doppler = 1.0 + 0.45 * clamp(end_doppler_shift, 0.0, 1.6) * dot(dir, -basis.disk_u);
         let photon_ring = exp(-ring_dist * 24.0) * 5.2 + exp(-ring_dist * 6.5) * 0.42;
         accum_rgb += transmittance * vec3<f32>(1.68, 1.24, 0.76) * photon_ring * max(side_doppler, 0.45) * end_disk_intensity;
