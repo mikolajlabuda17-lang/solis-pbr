@@ -77,6 +77,12 @@ override vibrance: f32             = 0.12;
 override vignette_strength: f32    = 0.22;
 override fxaa_enabled: bool        = true;
 
+override end_black_hole: bool      = true;
+override end_bh_size: f32          = 1.0;
+override end_disk_intensity: f32   = 1.15;
+override end_doppler_shift: f32    = 1.0;
+override end_ambient_light: f32    = 1.0;
+
 // --- Safe Math & Color Helpers ---
 fn saturate_f(x: f32) -> f32 {
     return clamp(x, 0.0, 1.0);

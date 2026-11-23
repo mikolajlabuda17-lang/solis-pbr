@@ -404,6 +404,9 @@ fn eval_aurora(dir: vec3<f32>, env: LightEnvironment) -> vec3<f32> {
 
 // Full Physical Sky Dome along unit world direction `dir`
 fn eval_physical_sky(dir: vec3<f32>, with_upper_layers: bool) -> vec3<f32> {
+    if frame.dimension == 1 {
+        return eval_end_sky(dir, with_upper_layers);
+    }
     if frame.dimension != 0 {
         return frame.fog_color;
     }
@@ -487,7 +490,26 @@ fn apply_aerial_fog(surface_color: vec3<f32>, camera_rel_pos: vec3<f32>) -> vec3
     let view_dir = camera_rel_pos / max(dist, 1e-4);
     let v_fog = vanilla_fog(camera_rel_pos);
 
-    if frame.dimension != 0 || frame.eye_in >= 2u || frame.blindness > 0.01 || frame.darkness > 0.01 {
+    if frame.eye_in >= 2u || frame.blindness > 0.01 || frame.darkness > 0.01 {
+        return mix(surface_color, frame.fog_color, v_fog);
+    }
+
+    if frame.dimension == 1 {
+        let world_y = frame.camera_position.y + camera_rel_pos.y;
+        let void_abyss = smoothstep(46.0, 4.0, world_y) * 0.55;
+        // Ignore Ender Dragon's short 40-block boss fog clamp so Obsidian pillars stay crisp and dark against Gargantua!
+        let far_fade = smoothstep(0.62, 1.0, dist / max(frame.far, 64.0));
+        let end_sigma = 0.00085 * fog_density * (1.0 + void_abyss * 2.4);
+        let scatter_end = 1.0 - exp(-dist * end_sigma);
+
+        let cos_bh = dot(view_dir, normalize(END_BH_DIR));
+        let bh_rim = pow(max(cos_bh, 0.0), 5.0) * vec3<f32>(0.055, 0.030, 0.012) * end_disk_intensity * select(0.0, 1.0, end_black_hole);
+        let void_haze = vec3<f32>(0.005, 0.004, 0.011) + bh_rim;
+        let end_fog_t = saturate_f(max(scatter_end * 0.65, far_fade * 0.92));
+        return mix(surface_color, void_haze, end_fog_t);
+    }
+
+    if frame.dimension != 0 {
         return mix(surface_color, frame.fog_color, v_fog);
     }
 

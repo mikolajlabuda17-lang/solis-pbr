@@ -144,10 +144,19 @@ fn post(input: PostInput) -> vec4<f32> {
     let d = input.depth;
 
     if d == 0.0 {
-        // Composite 3D volumetric clouds onto the full-res sky dome (occluding sun, moon & stars smoothly)
-        let clouds = upsample_sky_clouds(input.uv);
-        let cloud_a = saturate_f(clouds.a);
-        color = color * (1.0 - cloud_a) + max(clouds.rgb, vec3<f32>(0.0));
+        if frame.dimension == 1 {
+            let p_near = view_position(input.uv, 0.5);
+            let p_far  = view_position(input.uv, 0.01);
+            let ray_dir = normalize(p_far - p_near);
+            // Preserve any additive End Crystal beam drawn over sky without depth
+            let beam_excess = max(input.color.rgb - vec3<f32>(0.09), vec3<f32>(0.0));
+            color = eval_end_sky(ray_dir, true) + beam_excess;
+        } else {
+            // Composite 3D volumetric clouds onto the full-res sky dome (occluding sun, moon & stars smoothly)
+            let clouds = upsample_sky_clouds(input.uv);
+            let cloud_a = saturate_f(clouds.a);
+            color = color * (1.0 - cloud_a) + max(clouds.rgb, vec3<f32>(0.0));
+        }
     } else {
         // Apply bilateral contact-shadow SSAO
         let ao = clamp(upsample_ssao_bilateral(input.uv, d), 0.18, 1.0);

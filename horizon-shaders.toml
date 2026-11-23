@@ -1,9 +1,9 @@
 schema = 1
 id = "solis_pbr"
 name = "Solis PBR"
-version = "1.0.0"
+version = "1.1.0"
 api = "0.2"
-description = "Fizyczny shaderpack PBR dla Horizon: rozpraszanie atmosferyczne, wolumetryczne chmury, miekkie cienie PCF i kolorowe szklo, woda z odbiciami i kaustyka, mokry teren i kaluze w deszczu, swiecace rudy oraz tonemapping AgX/ACES."
+description = "Realistic physically-based PBR shaderpack for Horizon: Rayleigh/Mie sky, Total Solar Eclipse (5800), The End Relativistic Gargantua Black Hole, 3D clouds, PCF coloured shadows, caustics, rain puddles & AgX."
 authors = ["mikolajlabuda17-lang"]
 license = "MIT"
 shared = ["lib/common.wgsl"]
@@ -17,8 +17,8 @@ fog = "pack"
 
 [sky]
 file = "sky.wgsl"
-files = ["lib/atmosphere.wgsl"]
-name = "Physical Sky & Aurora"
+files = ["lib/atmosphere.wgsl", "lib/end_gargantua.wgsl"]
+name = "Physical Sky, Aurora & Gargantua"
 clouds = false
 sun = false
 moon = false
@@ -46,17 +46,17 @@ name = "Wind & Waves"
 
 [material]
 file = "material.wgsl"
-files = ["lib/atmosphere.wgsl", "lib/lighting.wgsl", "lib/water.wgsl"]
+files = ["lib/atmosphere.wgsl", "lib/end_gargantua.wgsl", "lib/lighting.wgsl", "lib/water.wgsl"]
 name = "PBR Terrain & Water"
 
 [entity]
 file = "entity.wgsl"
-files = ["lib/atmosphere.wgsl", "lib/lighting.wgsl"]
+files = ["lib/atmosphere.wgsl", "lib/end_gargantua.wgsl", "lib/lighting.wgsl"]
 name = "PBR Entities"
 
 [weather]
 file = "weather.wgsl"
-files = ["lib/atmosphere.wgsl"]
+files = ["lib/atmosphere.wgsl", "lib/end_gargantua.wgsl"]
 name = "Atmospheric Weather"
 
 [[resource]]
@@ -67,21 +67,21 @@ keep = "view"
 
 [[post]]
 file = "post/clouds_ssao.wgsl"
-files = ["lib/atmosphere.wgsl"]
+files = ["lib/atmosphere.wgsl", "lib/end_gargantua.wgsl"]
 name = "Volumetric Clouds & SSAO"
 output = "atmo_half"
 reads = ["atmo_half_previous"]
 
 [[post]]
 file = "post/godrays.wgsl"
-files = ["lib/atmosphere.wgsl"]
+files = ["lib/atmosphere.wgsl", "lib/end_gargantua.wgsl"]
 name = "Volumetric Light Shafts"
 output = "shafts_quarter"
 scale = 0.25
 
 [[post]]
 file = "post/composite.wgsl"
-files = ["lib/atmosphere.wgsl"]
+files = ["lib/atmosphere.wgsl", "lib/end_gargantua.wgsl"]
 name = "Atmosphere & SSR Composite"
 reads = ["atmo_half"]
 
@@ -93,6 +93,7 @@ scale = 0.25
 
 [[post]]
 file = "post/grade_fxaa.wgsl"
+files = ["lib/atmosphere.wgsl", "lib/end_gargantua.wgsl"]
 name = "Lens, Grade & FXAA"
 
 [tonemap]
@@ -355,10 +356,23 @@ name = "Solis PBR"
 items = [
     "page:lighting",
     "page:sky_atmo",
+    "page:the_end",
     "page:water",
     "page:materials_rain",
     "page:camera_grade",
     "tonemap_operator"
+]
+
+[[pages]]
+id = "the_end"
+name = "End i Czarna Dziura"
+description = "Relatywistyczna czarna dziura Gargantua (soczewkowanie grawitacyjne, dysk akrecyjny, efekt Dopplera) i oswietlenie Endu."
+items = [
+    "end_black_hole",
+    "end_bh_size",
+    "end_disk_intensity",
+    "end_doppler_shift",
+    "end_ambient_light"
 ]
 
 [[pages]]
@@ -837,3 +851,50 @@ name = "Wygladzanie Krawedzi (FXAA)"
 description = "Przestrzenny antyaliasing wygladzajacy zabkowane krawedzie blokow w lancuchu post-process."
 type = "bool"
 default = true
+
+[[options]]
+id = "end_black_hole"
+name = "Czarna Dziura w Endzie (Gargantua)"
+description = "Renderuje relatywistyczna czarna dziure ze zakrzywieniem grawitacyjnym, pierścieniem fotonowym i ognistym dyskiem akrecyjnym w Endzie."
+type = "bool"
+default = true
+
+[[options]]
+id = "end_bh_size"
+name = "Rozmiar Czarnej Dziury"
+description = "Skala katowa czarnej dziury i jej dysku akrecyjnego na niebie Endu."
+type = "float"
+default = 1.0
+min = 0.5
+max = 2.0
+step = 0.05
+
+[[options]]
+id = "end_disk_intensity"
+name = "Jasnosc Dysku Akrecyjnego"
+description = "Intensywnosc emisji HDR zloto-bursztynowego dysku akrecyjnego, promieni i flary IMAX."
+type = "float"
+default = 1.15
+min = 0.4
+max = 2.5
+step = 0.05
+
+[[options]]
+id = "end_doppler_shift"
+name = "Relatywistyczny Efekt Dopplera"
+description = "Wzmacnia i rozjasnia zblizajaca sie strone wirujacej plazmy dysku akrecyjnego (jak w filmie Interstellar)."
+type = "float"
+default = 1.0
+min = 0.0
+max = 1.6
+step = 0.05
+
+[[options]]
+id = "end_ambient_light"
+name = "Oswietlenie Wysp Endu"
+description = "Jasnosc zlotego blasku czarnej dziury oraz kosmicznego oswietlenia otoczenia na blokach w Endzie."
+type = "float"
+default = 1.0
+min = 0.4
+max = 2.0
+step = 0.05

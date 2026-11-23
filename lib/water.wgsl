@@ -121,10 +121,19 @@ fn shade_water_surface(
     let v = -cam_pos / max(view_dist, 1e-4);
     let n = eval_water_normal(world_pos, geom_normal);
     let env = eval_environment();
+    let is_end = frame.dimension == 1;
 
     // Shadowing on the water surface itself (sun glint & surface scatter)
     let sun_shadow = eval_sun_shadow(cam_pos, geom_normal, screen_uv, 0.0);
-    let sky_exposure = smoothstep(0.05, 0.92, sky_light);
+    let sky_exposure = select(smoothstep(0.05, 0.92, sky_light), 1.0, is_end);
+    let water_light_dir = select(frame.light_direction, normalize(END_BH_DIR), is_end);
+    let water_active_rad = select(
+        env.active_radiance,
+        vec3<f32>(1.55, 0.96, 0.44) * end_disk_intensity * select(0.25, 1.0, end_black_hole),
+        is_end
+    );
+    let water_sky_zenith = select(env.sky_zenith, vec3<f32>(0.032, 0.022, 0.058), is_end);
+    let water_sky_horizon = select(env.sky_horizon, vec3<f32>(0.24, 0.14, 0.08) * end_disk_intensity, is_end);
 
     // Measure water depth behind this fragment from opaque_depth
     let res = frame.resolution;
@@ -158,16 +167,16 @@ fn shade_water_surface(
     var lit_seabed = seabed_rgb;
     if bg_rev_depth > 0.0 && water_thickness < 28.0 {
         let seabed_world = world_pos - v * water_thickness;
-        let caust = eval_underwater_caustics(seabed_world, frame.light_direction, water_thickness);
-        lit_seabed += seabed_rgb * caust * env.active_radiance * sun_shadow * sky_exposure * 0.55;
+        let caust = eval_underwater_caustics(seabed_world, water_light_dir, water_thickness);
+        lit_seabed += seabed_rgb * caust * water_active_rad * sun_shadow * sky_exposure * 0.55;
     }
 
     // Multiple-scattering water volume color (shallows turquoise glow + deep ocean navy)
     let block_rad = eval_block_illumination(cam_pos, block_light, lightmap_col, dynamic_col);
-    let vol_light = env.active_radiance * (0.14 + 0.18 * sun_shadow) * sky_exposure
-                  + env.sky_zenith * 0.55 * sky_exposure
+    let vol_light = water_active_rad * (0.14 + 0.18 * sun_shadow) * sky_exposure
+                  + water_sky_zenith * 0.55 * sky_exposure
                   + block_rad * 0.45;
-    let water_scatter_albedo = vec3<f32>(0.045, 0.28, 0.34) * tint_norm;
+    let water_scatter_albedo = select(vec3<f32>(0.045, 0.28, 0.34), vec3<f32>(0.055, 0.075, 0.16), is_end) * tint_norm;
     let inscatter = water_scatter_albedo * vol_light * (vec3<f32>(1.0) - transmittance);
 
     var underwater_col = lit_seabed * transmittance + inscatter;
@@ -177,7 +186,7 @@ fn shade_water_surface(
         let foam_n = sample_noise(world_pos.xz * 0.42 + vec2<f32>(frame.time * 0.02, -frame.time * 0.015));
         let edge_band = 1.0 - smoothstep(0.04, 0.55, water_thickness);
         let foam_mask = smoothstep(0.32, 0.72, edge_band + (foam_n.r - 0.45) * 0.45) * edge_band;
-        let foam_light = env.active_radiance * sun_shadow * 0.28 + env.sky_horizon * 0.55 + block_rad * 0.5;
+        let foam_light = water_active_rad * sun_shadow * 0.28 + water_sky_horizon * 0.55 + block_rad * 0.5;
         underwater_col = mix(underwater_col, foam_light * 0.85, saturate_f(foam_mask * 0.72));
     }
 
@@ -185,7 +194,7 @@ fn shade_water_surface(
     let n_dot_v = saturate_f(dot(n, v));
     let fresnel = 0.02 + 0.98 * pow5(1.0 - n_dot_v);
 
-    // Reflection: Horizon planar water mirror (`reflection`) + Physical Sky fallback
+    // Reflection: Horizon planar water mirror (`reflection`) + Physical Sky / Gargantua Black Hole fallback
     let refl_dir = reflect(-v, n);
     var refl_col = eval_physical_sky(vec3<f32>(refl_dir.x, abs(refl_dir.y), refl_dir.z), true) * sky_exposure;
 
@@ -201,9 +210,9 @@ fn shade_water_surface(
         refl_col = mix(refl_col, mirror_sample.rgb, mirror_weight);
     }
 
-    // Crisp GGX Solar & Lunar Sun-Glint Path on ripples
-    let glint = eval_ggx_specular(n, v, frame.light_direction, 0.055, vec3<f32>(0.025))
-              * env.active_radiance * sun_shadow * sky_exposure;
+    // Crisp GGX Solar / Lunar / Gargantua Accretion-Disk Glint Path on ripples
+    let glint = eval_ggx_specular(n, v, water_light_dir, 0.055, vec3<f32>(0.025))
+              * water_active_rad * sun_shadow * sky_exposure;
 
     // Combine underwater refracted radiance + Fresnel reflection + solar glint
     let refl_Factor = select(fresnel * 0.35, fresnel, frame.eye_in == 0u);

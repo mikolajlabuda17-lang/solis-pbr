@@ -52,6 +52,15 @@ fn entity(input: EntityInput) -> Surface {
 
         let cave_lift = base_flashed * (0.005 + frame.brightness * 0.012 + frame.night_vision * 0.24);
         lit += direct + ambient + cave_lift;
+    } else if frame.dimension == 1 {
+        // The End: Warm golden Gargantua rim/diffuse + GGX specular + cosmic violet ambient on Endermen, Dragon, Crystals & Armor!
+        let bh_l = normalize(END_BH_DIR);
+        let n_dot_bh = saturate_f((dot(n, bh_l) + 0.28) / 1.28);
+        let spec = eval_ggx_specular(n, view_dir, bh_l, roughness, f0);
+        let bh_rad = vec3<f32>(1.32, 0.86, 0.44) * end_disk_intensity * end_ambient_light * select(0.20, 1.0, end_black_hole);
+        let void_amb = vec3<f32>(0.13, 0.10, 0.22) * (end_ambient_light + frame.brightness * 0.25 + frame.night_vision * 2.2);
+        lit += (base_flashed * n_dot_bh + spec) * bh_rad * mix(1.0, input.shade, 0.35)
+             + base_flashed * void_amb * input.shade;
     } else {
         lit += base_flashed * input.shade * input.lightmap;
     }

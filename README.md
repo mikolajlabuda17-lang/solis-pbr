@@ -27,15 +27,15 @@
 
 ## Installation
 
-1. Copy `solis_pbr-1.0.0.hshader` into `shaderpacks/` next to `options.txt`.
+1. Copy `solis_pbr-1.1.0.hshader` into `shaderpacks/` next to `options.txt`.
 2. In Horizon, open **Options > Video Settings > Shaders > Shader Packs...** and select **Solis PBR**.
-3. Open **Shader Options...** to customize all 43 settings across 5 categories.
+3. Open **Shader Options...** to customize all 48 settings across 6 categories (including **The End & Black Hole**).
 
 ## Build & Check from Source
 
 ```sh
 horizon-shader check .
-horizon-shader pack . --out solis_pbr-1.0.0.hshader
+horizon-shader pack . --out solis_pbr-1.1.0.hshader
 ```
 
 ## License

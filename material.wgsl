@@ -215,8 +215,34 @@ fn material(input: MaterialInput) -> Surface {
         let cave_floor = base_albedo * (0.004 + frame.brightness * 0.012 + frame.night_vision * 0.24) * ao;
 
         total_light += sun_contrib + kd * base_albedo * sky_ambient + env_spec + cave_floor;
+    } else if frame.dimension == 1 {
+        // The End: Directional golden-amber Gargantua accretion-disk illumination + Cosmic indigo-violet void fill + GGX PBR specular!
+        let bh_l = normalize(END_BH_DIR);
+        let kd = (vec3<f32>(1.0) - f0) * (1.0 - metallic);
+        let n_dot_bh = max(dot(world_n, bh_l), 0.0);
+        let wrap_bh  = saturate_f((dot(world_n, bh_l) + 0.25) / 1.25);
+
+        let bh_rad = vec3<f32>(1.38, 0.90, 0.46) * end_disk_intensity * end_ambient_light * select(0.18, 1.0, end_black_hole);
+        let end_diff = kd * base_albedo * mix(n_dot_bh, wrap_bh, 0.35);
+        let end_spec = eval_ggx_specular(world_n, view_dir, bh_l, roughness, f0);
+        let bh_direct = (end_diff + end_spec) * bh_rad * ao;
+
+        // Hemispheric Cosmic Ambient: cool indigo-amethyst shadow fill + warm lit End-stone bounce
+        let hemi_up = world_n.y * 0.5 + 0.5;
+        let void_hemi = mix(vec3<f32>(0.11, 0.09, 0.16), vec3<f32>(0.14, 0.11, 0.24), hemi_up)
+                      * (end_ambient_light + frame.brightness * 0.25 + frame.night_vision * 2.2);
+        let end_amb = kd * base_albedo * void_hemi * ao;
+
+        // Fresnel environment reflection of Gargantua & End cosmos on Obsidian, Purpur, Crystals & Metals!
+        let n_dot_v = saturate_f(dot(world_n, view_dir));
+        let amb_fresnel = f_schlick_roughness(n_dot_v, f0, roughness);
+        let refl_ray = reflect(-view_dir, world_n);
+        let env_end_sky = eval_end_sky(refl_ray, false);
+        let end_env_spec = env_end_sky * amb_fresnel * smoothstep(0.88, 0.08, roughness) * ao * 1.25;
+
+        total_light += bh_direct + end_amb + end_env_spec;
     } else {
-        // Nether, End & modded dimensions: directional face shading + rich vanilla lightmap
+        // Nether & modded dimensions: directional face shading + rich vanilla lightmap
         let dim_shade = 0.72 + 0.28 * saturate_f(world_n.y * 0.5 + 0.5);
         total_light += base_albedo * input.lightmap * dim_shade * ao;
     }

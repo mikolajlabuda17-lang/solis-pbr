@@ -88,9 +88,53 @@ fn sample_bloom_tent(uv: vec2<f32>) -> vec3<f32> {
     return b * bloom_strength;
 }
 
-// Subtle Optical Sun Lens Ghosts & Anamorphic Streak
+// Subtle Optical Sun / Gargantua Lens Ghosts & IMAX Anamorphic Streak
 fn eval_sun_lens_flare(uv: vec2<f32>) -> vec3<f32> {
-    if !sun_flare || frame.dimension != 0 || frame.sun_direction.y <= 0.01 || frame.rain > 0.75 {
+    if !sun_flare {
+        return vec3<f32>(0.0);
+    }
+
+    // The End: Interstellar IMAX Anamorphic Golden Lens Streak & Optical Ghost on Gargantua!
+    if frame.dimension == 1 {
+        if !end_black_hole {
+            return vec3<f32>(0.0);
+        }
+        let bh_dir = normalize(END_BH_DIR);
+        let clip_bh = frame.projection * frame.view * vec4<f32>(bh_dir * 128.0, 1.0);
+        if clip_bh.w <= 0.05 {
+            return vec3<f32>(0.0);
+        }
+        let ndc_bh = clip_bh.xy / clip_bh.w;
+        if abs(ndc_bh.x) > 1.08 || abs(ndc_bh.y) > 1.08 {
+            return vec3<f32>(0.0);
+        }
+        let bh_uv = vec2<f32>(ndc_bh.x * 0.5 + 0.5, 0.5 - ndc_bh.y * 0.5);
+        // Sample accretion-ring rim visibility around the event horizon
+        let ring_r = 0.048 * clamp(end_bh_size, 0.5, 2.0);
+        var bh_vis = 0.0;
+        bh_vis += select(0.0, 0.25, depth_at(clamp(bh_uv + vec2<f32>( ring_r, 0.0), vec2<f32>(0.0), vec2<f32>(1.0))) == 0.0);
+        bh_vis += select(0.0, 0.25, depth_at(clamp(bh_uv + vec2<f32>(-ring_r, 0.0), vec2<f32>(0.0), vec2<f32>(1.0))) == 0.0);
+        bh_vis += select(0.0, 0.25, depth_at(clamp(bh_uv + vec2<f32>(0.0,  ring_r * 0.7), vec2<f32>(0.0), vec2<f32>(1.0))) == 0.0);
+        bh_vis += select(0.0, 0.25, depth_at(clamp(bh_uv + vec2<f32>(0.0, -ring_r * 0.7), vec2<f32>(0.0), vec2<f32>(1.0))) == 0.0);
+        if bh_vis <= 0.01 {
+            return vec3<f32>(0.0);
+        }
+
+        let aspect_e = frame.resolution.x / max(frame.resolution.y, 1.0);
+        let to_c = vec2<f32>(0.5) - bh_uv;
+        let d_g1 = length((uv - (bh_uv + to_c * 0.75)) * vec2<f32>(aspect_e, 1.0));
+        let d_g2 = length((uv - (bh_uv + to_c * 1.45)) * vec2<f32>(aspect_e, 1.0));
+        let ghost_a = smoothstep(0.10, 0.01, d_g1) * smoothstep(0.0, 0.035, d_g1) * vec3<f32>(1.0, 0.62, 0.24);
+        let ghost_b = smoothstep(0.14, 0.02, d_g2) * smoothstep(0.03, 0.085, d_g2) * vec3<f32>(0.58, 0.44, 0.95);
+
+        let s_dx = abs(uv.x - bh_uv.x) * aspect_e;
+        let s_dy = abs(uv.y - bh_uv.y);
+        let imax_streak = exp(-s_dx * 4.5) * exp(-s_dy * 95.0) * vec3<f32>(1.15, 0.74, 0.35);
+        let edge_fade = 1.0 - smoothstep(0.58, 1.05, max(abs(ndc_bh.x), abs(ndc_bh.y)));
+        return (ghost_a * 0.022 + ghost_b * 0.018 + imax_streak * 0.055) * bh_vis * edge_fade * end_disk_intensity;
+    }
+
+    if frame.dimension != 0 || frame.sun_direction.y <= 0.01 || frame.rain > 0.75 {
         return vec3<f32>(0.0);
     }
 
@@ -155,10 +199,11 @@ fn post(input: PostInput) -> vec4<f32> {
     hdr += sample_bloom_tent(input.uv);
     hdr += eval_sun_lens_flare(input.uv);
 
-    // 3. Smooth Eye Adaptation (driven by Horizon's 2s-smoothed eye_light_smooth + solar eclipse) + Manual EV
+    // 3. Smooth Eye Adaptation (driven by Horizon's 2s-smoothed eye_light_smooth + solar eclipse + End) + Manual EV
     let ecl_adapt = eval_solar_eclipse();
     let sun_adapt = smoothstep(-0.12, 0.25, frame.sun_direction.y) * (1.0 - ecl_adapt.obscuration * 0.88);
-    let env_light = max(frame.eye_light_smooth.y * sun_adapt, frame.eye_light_smooth.x * 0.75);
+    let overworld_env = max(frame.eye_light_smooth.y * sun_adapt, frame.eye_light_smooth.x * 0.75);
+    let env_light = select(overworld_env, 0.48, frame.dimension == 1);
     // Gently boost dark caves/nights and gently tame noon glare
     let auto_ev = mix(0.42, -0.14, env_light) * auto_exposure;
     let exposure_gain = exp2(exposure + auto_ev);

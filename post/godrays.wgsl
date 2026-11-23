@@ -3,7 +3,47 @@
 // ============================================================================
 
 fn post(input: PostInput) -> vec4<f32> {
-    if !godrays_enabled || godrays_strength <= 0.01 || frame.dimension != 0 {
+    if !godrays_enabled || godrays_strength <= 0.01 {
+        return vec4<f32>(0.0);
+    }
+
+    // The End: Subtle golden Gargantua crepuscular shafts ONLY across foreground pillars/terrain (`d > 0.0`), never washing out empty space!
+    if frame.dimension == 1 {
+        let d_e = depth_at(input.uv);
+        if !end_black_hole || d_e == 0.0 {
+            return vec4<f32>(0.0);
+        }
+        let p_near_e = view_position(input.uv, 0.5);
+        let p_far_e  = view_position(input.uv, 0.01);
+        let ray_e    = normalize(p_far_e - p_near_e);
+        let bh_dir   = normalize(END_BH_DIR);
+        let cos_bh   = dot(ray_e, bh_dir);
+        if cos_bh <= 0.15 {
+            return vec4<f32>(0.0);
+        }
+        let clip_bh = frame.projection * frame.view * vec4<f32>(bh_dir * 128.0, 1.0);
+        if clip_bh.w <= 0.01 {
+            return vec4<f32>(0.0);
+        }
+        let ndc_bh = clip_bh.xy / clip_bh.w;
+        let bh_uv = vec2<f32>(ndc_bh.x * 0.5 + 0.5, 0.5 - ndc_bh.y * 0.5);
+        let delta_e = (bh_uv - input.uv) / 10.0;
+        let jitter_e = interleaved_gradient_noise(input.pixel);
+
+        var occ_e = 0.0;
+        for (var k = 0u; k < 10u; k++) {
+            let suv = input.uv + delta_e * (f32(k) + jitter_e);
+            if suv.x >= 0.0 && suv.x <= 1.0 && suv.y >= 0.0 && suv.y <= 1.0 {
+                occ_e += select(0.0, 1.0, depth_at(suv) == 0.0);
+            }
+        }
+        let shaft_vis = occ_e / 10.0;
+        let phase_e = hg_phase(cos_bh, 0.75);
+        let end_shaft = vec3<f32>(1.35, 0.78, 0.32) * shaft_vis * phase_e * smoothstep(0.15, 0.75, cos_bh) * 0.055 * end_disk_intensity * godrays_strength;
+        return vec4<f32>(max(end_shaft, vec3<f32>(0.0)), 1.0);
+    }
+
+    if frame.dimension != 0 {
         return vec4<f32>(0.0);
     }
 
