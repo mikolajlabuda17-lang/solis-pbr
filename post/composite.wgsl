@@ -190,6 +190,16 @@ fn post(input: PostInput) -> vec4<f32> {
         all(sample_uv == input.uv)
     );
 
+    // Camera submerged inside molten lava (`eye_in == 2u`): 100% opaque incandescent convective magma (no SSAO block outlines or sky bleed!)
+    if frame.eye_in == 2u {
+        let lava_dist = select(16.0, length(view_position(input.uv, d)), d > 0.0);
+        let swirl_uv = input.uv * 2.2 + vec2<f32>(frame.time * 0.04, -frame.time * 0.07);
+        let conv = 0.86 + 0.28 * sample_noise(swirl_uv).r;
+        let magma_col = vec3<f32>(0.88, 0.145, 0.014) * conv;
+        let magma_mix = saturate_f(max(1.0 - exp(-lava_dist * 5.2), smoothstep(0.06, 0.48, lava_dist)));
+        return vec4<f32>(mix(color, magma_col, magma_mix), 1.0);
+    }
+
     if d == 0.0 {
         if frame.dimension == 1 {
             let p_near = view_position(sample_uv, 0.5);
@@ -211,8 +221,11 @@ fn post(input: PostInput) -> vec4<f32> {
             color = color * (1.0 - cloud_a) + max(clouds.rgb, vec3<f32>(0.0));
         }
     } else {
-        // Apply bilateral contact-shadow SSAO
-        let ao = clamp(upsample_ssao_bilateral(input.uv, d), 0.18, 1.0);
+        // Apply bilateral contact-shadow SSAO (faded cleanly with fog so SSAO never paints outlines through thick fog/snow!)
+        let v_pos = view_position(input.uv, d);
+        let fog_atten = select(vanilla_fog(v_pos), 0.0, frame.dimension == 1 || frame.dimension == -1);
+        let raw_ao = clamp(upsample_ssao_bilateral(input.uv, d), 0.18, 1.0);
+        let ao = mix(raw_ao, 1.0, saturate_f(fog_atten));
         color *= ao;
 
         // Screen-Space Reflections on wet puddles & smooth blocks

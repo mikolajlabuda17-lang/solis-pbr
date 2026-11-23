@@ -579,7 +579,14 @@ fn apply_aerial_fog(surface_color: vec3<f32>, camera_rel_pos: vec3<f32>) -> vec3
     let view_dir = camera_rel_pos / max(dist, 1e-4);
     let v_fog = vanilla_fog(camera_rel_pos);
 
-    if frame.eye_in >= 2u || frame.blindness > 0.01 || frame.darkness > 0.01 {
+    // Submerged in molten lava (`eye_in == 2u`): liquid rock is opaque incandescent magma (even in Creative mode!)
+    if frame.eye_in == 2u {
+        let magma_glow = vec3<f32>(0.88, 0.145, 0.014);
+        let magma_opaq = saturate_f(max(1.0 - exp(-dist * 4.8), smoothstep(0.05, 0.50, dist)));
+        return mix(surface_color, magma_glow, magma_opaq);
+    }
+
+    if frame.eye_in >= 3u || frame.blindness > 0.01 || frame.darkness > 0.01 {
         return mix(surface_color, frame.fog_color, v_fog);
     }
 
