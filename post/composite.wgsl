@@ -195,7 +195,9 @@ fn post(input: PostInput) -> vec4<f32> {
             let p_near = view_position(sample_uv, 0.5);
             let p_far  = view_position(sample_uv, 0.01);
             let ray_dir = normalize(p_far - p_near);
-            let beam_excess = max(color - vec3<f32>(0.09), vec3<f32>(0.0));
+            // Preserve only genuine bright white-magenta End crystal healing beams (never static End sky tiles!)
+            let min_c = min(color.r, min(color.g, color.b));
+            let beam_excess = select(vec3<f32>(0.0), max(color - vec3<f32>(0.25), vec3<f32>(0.0)), min_c > 0.25);
             color = eval_end_sky(ray_dir, true) + beam_excess;
         } else if frame.dimension == -1 && nether_overhaul {
             let p_near_n = view_position(sample_uv, 0.5);

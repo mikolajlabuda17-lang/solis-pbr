@@ -49,18 +49,20 @@ fn eval_end_cosmos(ray_dir: vec3<f32>, with_stars: bool) -> vec3<f32> {
 
     let uv_a = vec2<f32>(dot(d, basis.disk_u), dot(d, basis.forward)) * 0.55 + vec2<f32>(0.31, 0.67);
     let uv_b = vec2<f32>(d.x + d.z * 0.5, d.y - d.x * 0.35) * 0.95;
-    let n1 = sample_noise(uv_a).rgb;
-    let n2 = sample_noise(uv_b * 1.8 + vec2<f32>(0.14, 0.82)).rgb;
+    let n1_r = sample_noise(uv_a).r;
+    let n1_r2 = sample_noise(uv_a * 1.9 + vec2<f32>(0.47, 0.29)).r;
+    let n2_r = sample_noise(uv_b * 1.8 + vec2<f32>(0.14, 0.82)).r;
+    let n2_r2 = sample_noise(uv_b * 3.1 + vec2<f32>(0.63, 0.41)).r;
 
-    let nebula_wisp = smoothstep(0.42, 0.88, n1.r * 0.62 + n2.g * 0.38);
-    let dust_lane   = smoothstep(0.30, 0.72, n2.b);
+    let nebula_wisp = smoothstep(0.42, 0.88, n1_r * 0.62 + n2_r * 0.38);
+    let dust_lane   = smoothstep(0.32, 0.74, n2_r2);
 
     // Deep pitch-black cosmic void so Gargantua's golden accretion disk & Einstein stars pop with maximum contrast!
     var bg = vec3<f32>(0.0014, 0.0012, 0.0032);
 
-    // Subtle cosmic ender-amethyst & warm stardust galactic band
+    // Subtle cosmic ender-amethyst & warm stardust galactic band (pure Perlin `.r`, zero Voronoi polygons!)
     let violet_neb = vec3<f32>(0.013, 0.006, 0.026) * nebula_wisp * (0.35 + 0.65 * gal_band);
-    let gold_dust  = vec3<f32>(0.016, 0.009, 0.004) * gal_band * smoothstep(0.48, 0.88, n1.g);
+    let gold_dust  = vec3<f32>(0.015, 0.008, 0.004) * gal_band * smoothstep(0.48, 0.88, n1_r2);
     bg += (violet_neb + gold_dust) * (1.0 - dust_lane * 0.58);
 
     if with_stars && stars_enabled {
@@ -197,10 +199,10 @@ fn eval_end_sky(dir: vec3<f32>, with_fine_detail: bool) -> vec3<f32> {
     // Monumental Gargantua camera distance in Schwarzschild radii `r_s = 1.0`!
     let cam_dist = 11.8 / scale;
 
-    // Analytic weak-field Einstein deflection for far-sky continuity (zero outer cone seam!)
-    let sin_th_far = sqrt(max(1.0 - cos_bh * cos_bh, 1e-5));
-    let b_approx   = cam_dist * sin_th_far;
-    let alpha_weak = 2.0 / max(b_approx, 2.6);
+    // Analytic weak-field Einstein deflection using monotonic chord `sqrt(2*(1 - cos_bh))` (ZERO antipode pinch at 180 deg!)
+    let chord_far = sqrt(max(2.0 * (1.0 - cos_bh), 1e-5));
+    let b_approx  = cam_dist * chord_far;
+    let alpha_weak = (2.0 / max(b_approx, 2.6)) * smoothstep(-0.35, 0.35, cos_bh);
     let weak_lensed_dir = normalize(dir + basis.forward * min(alpha_weak, 0.28));
 
     if cos_bh < 0.34 {

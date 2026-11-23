@@ -121,17 +121,12 @@ fn eval_sun_lens_flare(uv: vec2<f32>) -> vec3<f32> {
         }
 
         let aspect_e = frame.resolution.x / max(frame.resolution.y, 1.0);
-        let to_c = vec2<f32>(0.5) - bh_uv;
-        let d_g1 = length((uv - (bh_uv + to_c * 0.75)) * vec2<f32>(aspect_e, 1.0));
-        let d_g2 = length((uv - (bh_uv + to_c * 1.45)) * vec2<f32>(aspect_e, 1.0));
-        let ghost_a = smoothstep(0.10, 0.01, d_g1) * smoothstep(0.0, 0.035, d_g1) * vec3<f32>(1.0, 0.62, 0.24);
-        let ghost_b = smoothstep(0.14, 0.02, d_g2) * smoothstep(0.03, 0.085, d_g2) * vec3<f32>(0.58, 0.44, 0.95);
-
+        // Clean horizontal IMAX anamorphic golden streak ONLY right on Gargantua (no mirrored ghost rings that look like a 2nd black hole!)
         let s_dx = abs(uv.x - bh_uv.x) * aspect_e;
         let s_dy = abs(uv.y - bh_uv.y);
         let imax_streak = exp(-s_dx * 4.5) * exp(-s_dy * 95.0) * vec3<f32>(1.15, 0.74, 0.35);
         let edge_fade = 1.0 - smoothstep(0.58, 1.05, max(abs(ndc_bh.x), abs(ndc_bh.y)));
-        return (ghost_a * 0.022 + ghost_b * 0.018 + imax_streak * 0.055) * bh_vis * edge_fade * end_disk_intensity;
+        return imax_streak * 0.052 * bh_vis * edge_fade * end_disk_intensity;
     }
 
     if frame.dimension != 0 || frame.sun_direction.y <= 0.01 || frame.rain > 0.75 {
